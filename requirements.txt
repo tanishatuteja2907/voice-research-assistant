@@ -1,0 +1,7 @@
+gnani-vachana
+python-dotenv
+requests
+sounddevice
+scipy
+numpy
+pypdf
