@@ -114,7 +114,7 @@ def ask_llm(question, passages, lang):
     else:
         language_rule = "Reply in English."
     prompt = (
-        "You are a voice assistant for a visually impaired student. "
+        "You are a voice assistant for a visually impaired user. "
         "Answer the question using ONLY the passages below. "
         f"{language_rule} Use at most 4 short sentences, in a plain spoken style, "
         "with no markdown, no bullet points and no symbols. "

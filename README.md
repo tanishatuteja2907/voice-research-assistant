@@ -1,9 +1,9 @@
-# Voice Research Assistant for Visually Impaired Students
+# Voice Research Assistant for Visually Impaired users
 
 Ask questions about a textbook by voice, in English or Hindi, and hear the answer spoken back.
 
 ## The problem
-A textbook is hard to skim or search without sight. This assistant lets a student simply ask a question and listen to the answer.
+A textbook is hard to skim or search without sight. This assistant lets a user simply ask a question and listen to the answer.
 
 ## How it works
 Mic -> Gnani STT (Prisma) -> search over book text -> Gemini answer -> Gnani TTS (Timbre) -> speaker
