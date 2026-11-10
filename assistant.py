@@ -1,3 +1,4 @@
+import json
 import warnings
 warnings.filterwarnings("ignore", message="Reached EOF prematurely")
 import os, glob, re, math, collections, msvcrt, logging, time
@@ -13,9 +14,9 @@ from gnani.tts import GnaniTTSClient
 
 logging.getLogger("pypdf").setLevel(logging.ERROR)
 
-# ---------- settings ----------
-LLM_MODEL = "gemini-3-flash-preview"
-FALLBACK_MODELS = ["gemini-flash-lite-latest"]
+
+LLM_MODEL = "gemini-3.1-flash-lite-preview"
+FALLBACK_MODELS = ["gemini-flash-lite-latest", "gemini-3-flash-preview"]
 SILENCE_THRESHOLD = 150
 VOICES = {"en": ("Pranav", "en-IN"), "hi": ("Nalini", "hi-IN")}
 CORRECTIONS = {"sonali": "Tenali", "core": "court", "queens": "queen"}
@@ -91,7 +92,7 @@ def call_gemini(prompt):
                     headers={"x-goog-api-key": os.environ["GEMINI_API_KEY"],
                              "Content-Type": "application/json"},
                     json={"contents": [{"parts": [{"text": prompt}]}]},
-                    timeout=25,
+                    timeout=12,
                 )
             except requests.RequestException as e:
                 print(f"GEMINI {model} failed: {type(e).__name__}")
@@ -125,6 +126,25 @@ def ask_llm(question, passages, lang):
         f"Passages:\n{context}\n\nQuestion: {question}"
     )
     return call_gemini(prompt)
+
+CACHE_FILE = "answer_cache.json"
+
+def _norm(text):
+    return re.sub(r"\s+", " ", re.sub(r"[^\w\u0900-\u097F ]", "", text.lower())).strip()
+
+def ask_llm_cached(question, passages, lang):
+    key = f"{lang}|{_norm(question)}"
+    cache = {}
+    if os.path.exists(CACHE_FILE):
+        with open(CACHE_FILE, encoding="utf-8") as fh:
+            cache = json.load(fh)
+    if key in cache:
+        return cache[key]
+    answer = ask_llm(question, passages, lang)
+    cache[key] = answer
+    with open(CACHE_FILE, "w", encoding="utf-8") as fh:
+        json.dump(cache, fh, ensure_ascii=False, indent=1)
+    return answer
 
 def translate_query(question):
     return call_gemini("Translate this Hindi question into simple English. "
@@ -160,6 +180,27 @@ def detect_command(en, hi):
     if any(w in t for w in ["repeat", "again", "दोहरा", "दोबारा", "फिर से"]):
         return "same"
     return None
+
+SUMMARIES_FILE = "summaries.json"
+
+def is_summary_request(text):
+    t = text.lower()
+    keys = ["summar", "summery", "overview", "book about", "story about",
+            "सारांश", "संक्षेप", "सार "]
+    return any(k in t for k in keys)
+
+def get_summary(passages, lang):
+    if not os.path.exists(SUMMARIES_FILE):
+        return None
+    with open(SUMMARIES_FILE, encoding="utf-8") as fh:
+        data = json.load(fh)
+    if not data:
+        return None
+    name = next(iter(data))
+    if len(data) > 1 and passages:
+        top = passages[0][0]
+        name = next((n for n in data if top.startswith(n)), name)
+    return data[name].get(lang) or data[name].get("en")
 
 # ---------- speech ----------
 def split_sentences(text, limit=300):
@@ -299,7 +340,15 @@ def main():
 
             passages = search(search_text, chunks, toks, idf)
             out_lang = lang
-            if not passages:
+            answer = None
+            if is_summary_request(f"{q} {search_text}"):
+                try:
+                    answer = get_summary(passages, lang)
+                except Exception as e:
+                    print("Summary failed:", e)
+            if answer:
+                pass
+            elif not passages:
                 answer = MSG[lang]["not_found"]
             else:
                 try:
@@ -318,4 +367,5 @@ def main():
             print("Error:", e)
             speak(MSG["en"]["error"], "en")
 
-main()
+if __name__ == "__main__":
+    main()
