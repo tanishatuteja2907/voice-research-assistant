@@ -15,8 +15,8 @@ from gnani.tts import GnaniTTSClient
 logging.getLogger("pypdf").setLevel(logging.ERROR)
 
 
-LLM_MODEL = "gemini-3.1-flash-lite-preview"
-FALLBACK_MODELS = ["gemini-flash-lite-latest", "gemini-3-flash-preview"]
+LLM_MODEL = "gemini-flash-lite-latest"
+FALLBACK_MODELS = ["gemini-3.1-flash-lite-preview", "gemini-3-flash-preview"]
 SILENCE_THRESHOLD = 150
 VOICES = {"en": ("Pranav", "en-IN"), "hi": ("Nalini", "hi-IN")}
 CORRECTIONS = {"sonali": "Tenali", "core": "court", "queens": "queen"}
@@ -71,14 +71,17 @@ def build_index(chunks):
     idf = {w: math.log((n + 1) / (c + 0.5)) for w, c in df.items()}
     return toks, idf
 
-def search(question, chunks, toks, idf, k=3):
+def search(question, chunks, toks, idf, k=6):
     q = set(words(question))
     scored = []
     for i, t in enumerate(toks):
         counts = collections.Counter(t)
-        s = sum(idf.get(w, 0) * counts[w] / (counts[w] + 1) for w in q if w in counts)
-        if s > 0:
-            scored.append((s, i))
+        hit = [w for w in q if w in counts]
+        if not hit:
+            continue
+        s = sum(idf.get(w, 0) * counts[w] / (counts[w] + 1) for w in hit)
+        s *= 1 + len(hit) / max(len(q), 1)
+        scored.append((s, i))
     scored.sort(reverse=True)
     return [chunks[i] for _, i in scored[:k]]
 
@@ -119,9 +122,9 @@ def ask_llm(question, passages, lang):
         "Answer the question using ONLY the passages below. "
         f"{language_rule} Use at most 4 short sentences, in a plain spoken style, "
         "with no markdown, no bullet points and no symbols. "
-        "Answer only what was asked and add no extra details. "
-        "If the passages describe different events, use only the passage "
-        "that directly answers the question. "
+        "If the question is broad, for example it asks for one mystery or one example, "
+        "choose one clear example from the passages and answer using only that one. "
+        "Otherwise answer only what was asked and add no extra details. "
         "If the answer is not in the passages, say you could not find it in the books.\n\n"
         f"Passages:\n{context}\n\nQuestion: {question}"
     )
@@ -141,9 +144,10 @@ def ask_llm_cached(question, passages, lang):
     if key in cache:
         return cache[key]
     answer = ask_llm(question, passages, lang)
-    cache[key] = answer
-    with open(CACHE_FILE, "w", encoding="utf-8") as fh:
-        json.dump(cache, fh, ensure_ascii=False, indent=1)
+    if "could not find" not in answer.lower():
+        cache[key] = answer
+        with open(CACHE_FILE, "w", encoding="utf-8") as fh:
+            json.dump(cache, fh, ensure_ascii=False, indent=1)
     return answer
 
 def translate_query(question):

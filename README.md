@@ -3,7 +3,7 @@
 Ask questions about any book or document by voice, in English or Hindi, and hear the answer spoken back.
 
 - One-page pitch: [PITCH.md](PITCH.md)
-- Demo video: PASTE-YOUR-VIDEO-LINK-HERE
+- Demo video: https://1drv.ms/v/c/1f419d7cbb36fe19/IQB42WMWXN2ZTY6kUbIHuJIJAS48qeDwrjRVk14KF3nq-TI?e=P6Fabh
 
 ## How it works
 Mic -> Gnani STT (Prisma) -> search over document text -> Gemini answer -> Gnani TTS (Timbre) -> speaker
